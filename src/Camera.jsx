@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 
 /**
- * React component: Low-resolution camera to trigger macro lens.
- * Uses 720p resolution to encourage browser to select close-focus capable lens.
+ * React component: Optimal camera selection strategy.
+ * Uses high-resolution constraints with exact facingMode to guide Chrome
+ * to select the main rear camera, then applies delayed focus optimization.
  */
 export default function Camera() {
   const videoRef = useRef(null);
@@ -14,32 +15,57 @@ export default function Camera() {
   useEffect(() => {
     async function startCamera() {
       try {
-        // Low resolution to trigger macro/wide-angle lens selection
-        const constraints = {
+        // Optimal constraints to guide Chrome to select main camera
+        const optimalConstraints = {
           video: {
-            facingMode: "environment",
-            width: { ideal: 1280 },  // 嘗試中等解析度
-            height: { ideal: 720 }   // 很多輔助鏡頭的最高解析度就在這附近
+            // 1. Force rear camera with exact constraint
+            facingMode: { exact: 'environment' },
+
+            // 2. Request very high resolution (ideal) to guide selection to main camera
+            // Even if device can't reach it, Chrome will pick the camera closest to this value
+            width: { ideal: 4096 },  // 4K width
+            height: { ideal: 2160 }, // 4K height
+
+            // 3. Request stable frame rate
+            frameRate: { ideal: 30 },
+
+            // 4. Attempt continuous focus in initial request
+            advanced: [
+              { focusMode: 'continuous' }
+            ]
           }
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(optimalConstraints);
         streamRef.current = stream;
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
 
-          // Apply continuous focus if available
-          const track = stream.getVideoTracks()[0];
-          const capabilities = track.getCapabilities();
+          console.log('✅ Successfully obtained stream. Applying focus optimization...');
 
-          if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-          }
+          // Delayed focus optimization (double insurance)
+          // Since load time is not critical, we use this time to ensure focus is activated
+          setTimeout(async () => {
+            const track = stream.getVideoTracks()[0];
+            try {
+              // Re-apply focus constraints to ensure focus mode is activated
+              await track.applyConstraints({
+                advanced: [
+                  { focusMode: 'continuous' },
+                  { focusDistance: 0.15 } // Attempt to lock near distance
+                ]
+              });
+              console.log('✅ Focus optimization applied');
+            } catch (e) {
+              console.warn('⚠️ Focus optimization failed (expected on some devices):', e);
+              // Ignore failure, but we tried our best
+            }
+          }, 500); // 500ms short delay
         }
       } catch (err) {
-        console.error('Error starting camera:', err);
+        console.error('❌ Cannot obtain camera matching constraints:', err);
         setError('Could not start camera. Please ensure permissions are granted.');
       }
     }
@@ -112,7 +138,7 @@ export default function Camera() {
 
       {/* Bottom Controls */}
       <div className="absolute bottom-0 left-0 w-full p-8 pb-12 z-20 flex flex-col items-center gap-4 bg-gradient-to-t from-black/80 to-transparent">
-        <p className="text-white/80 text-sm">Using macro lens for close-up clarity</p>
+        <p className="text-white/80 text-sm">Optimized for main camera clarity</p>
 
         {/* Shutter Button */}
         <button
