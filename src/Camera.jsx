@@ -21,10 +21,10 @@ export default function Camera() {
             // 1. Force rear camera with exact constraint
             facingMode: { exact: 'environment' },
 
-            // 2. Request very high resolution (ideal) to guide selection to main camera
-            // Even if device can't reach it, Chrome will pick the camera closest to this value
-            width: { ideal: 4096 },  // 4K width
-            height: { ideal: 2160 }, // 4K height
+            // 2. Request very high resolution with minimum requirement
+            // min: ensures preview quality, ideal: guides camera selection
+            width: { min: 1920, ideal: 4096 },   // Min 1080p, ideal 4K
+            height: { min: 1080, ideal: 2160 },  // Min 1080p, ideal 4K
 
             // 3. Request stable frame rate
             frameRate: { ideal: 30 },
@@ -51,12 +51,12 @@ export default function Camera() {
             const track = stream.getVideoTracks()[0];
             try {
               // Re-apply focus constraints to ensure focus mode is activated
-              // Including macro mode and extreme close-up distance (5cm)
+              // Including macro mode and close-up distance (12cm for better clarity)
               await track.applyConstraints({
                 advanced: [
                   { focusMode: 'continuous' },
                   { focusMode: 'macro' },        // Force macro focus mode
-                  { focusDistance: 0.05 }        // Lock at 5cm (0.05m) for ID cards
+                  { focusDistance: 0.12 }        // Lock at 12cm (0.12m) for ID cards
                 ]
               });
               console.log('✅ Macro focus optimization applied');
